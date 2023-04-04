@@ -1,0 +1,69 @@
+
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from scipy.optimize import curve_fit
+
+def gaussian_2d(x_data_tuple, amplitude, xo, yo, sigma_x, sigma_y, offset):
+    (x, y) = x_data_tuple
+    xo, yo = float(xo), float(yo)
+    g = offset + amplitude * np.exp(-(((x - xo) / sigma_x) ** 2 + ((y - yo) / sigma_y) ** 2) / 2)
+    return g.ravel()
+
+def plot_intensity_data_3d(image, ax, color, label):
+    x = np.linspace(0, image.shape[1] - 1, image.shape[1])
+    y = np.linspace(0, image.shape[0] - 1, image.shape[0])
+    X, Y = np.meshgrid(x, y)
+    ax.plot_surface(X, Y, image, cmap=color, alpha=0.5, label = label)
+
+def analyze_images(image1_path, image2_path):
+    image1 = cv2.imread(image1_path, cv2.IMREAD_GRAYSCALE)
+    image2 = cv2.imread(image2_path, cv2.IMREAD_GRAYSCALE)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    plot_intensity_data_3d(image1, ax, 'autumn', 'before')
+    plot_intensity_data_3d(image2, ax, 'winter', 'after')
+
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Intensity')
+    plt.legend
+    plt.show()
+
+    peaks = []
+    for image in [image1, image2]:
+        x = np.linspace(0, image.shape[1] - 1, image.shape[1])
+        y = np.linspace(0, image.shape[0] - 1, image.shape[0])
+        X, Y = np.meshgrid(x, y)
+
+        initial_guess = (image.max(), image.shape[1] / 2, image.shape[0] / 2, 20, 20, 0)
+        popt, _ = curve_fit(gaussian_2d, (X, Y), image.ravel(), p0=initial_guess)
+
+        peak_x, peak_y = popt[1], popt[2]
+        peaks.append((peak_x, peak_y))
+
+    peaks = np.array(peaks)
+    plt.scatter(peaks[:, 0], peaks[:, 1], c=['r', 'b'], marker='o')
+    plt.plot(peaks[:, 0], peaks[:, 1], 'k--')
+    plt.xlabel('X')
+    plt.ylabel('Y')
+    plt.title('Laser Beam Peaks')
+    for i, peak in enumerate(peaks):
+        plt.text(peak[0], peak[1], f'({peak[0]:.2f}, {peak[1]:.2f})', fontsize=12)
+    plt.show()
+
+    displacement = np.sqrt((peaks[1, 0] - peaks[0, 0])**2 + (peaks[1, 1] - peaks[0, 1])**2)
+    # Display displacement at the top left corner of the plot
+    xmin, xmax = plt.xlim()
+    ymin, ymax = plt.ylim()
+    displacement_text = f"Displacement: {displacement:.2f} a.u."
+    plt.text(xmin + 0.02*(xmax-xmin), ymax - 0.05*(ymax-ymin), displacement_text, fontsize=12, verticalalignment='top')
+    print(f"Displacement: {displacement:.2f} a.u.")
+
+if __name__ == '__main__':
+    before_image_path = 'before.PNG'
+    after_image_path = 'after.PNG'
+    analyze_images(before_image_path, after_image_path)
